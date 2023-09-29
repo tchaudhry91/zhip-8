@@ -12,6 +12,7 @@ const CHIP8 = struct {
     sound_timer: u8 = 0,
     keypad: [16]bool = [_]bool{false} ** 16,
     V: [16]u8 = [_]u8{0} ** 16, // Registers
+    randomizer: std.rand.Random = std.rand.Random.init(std.time.currentTime()),
 
     const fontset: [80]u8 = [_]u8{
         0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
@@ -109,9 +110,86 @@ const CHIP8 = struct {
             0x7 => {
                 self.V[inst.x] += inst.nn;
             },
+            0x8 => {
+                switch (inst.n) {
+                    0x0 => {
+                        self.V[inst.x] = self.V[inst.y];
+                    },
+                    0x1 => {
+                        self.V[inst.x] |= self.V[inst.y];
+                    },
+                    0x2 => {
+                        self.V[inst.x] &= self.V[inst.y];
+                    },
+                    0x3 => {
+                        self.V[inst.x] ^= self.V[inst.y];
+                    },
+                    0x4 => {
+                        const sum = @addWithOverflow(self.V[inst.x], self.V[inst.y]);
+                        self.V[inst.x] = sum[0];
+                        // Overflow Check
+                        if (sum[1] == 1) {
+                            self.V[0xF] = 1;
+                        }
+                    },
+                    0x5 => {
+                        const diff = @subWithOverflow(self.V[inst.x], self.V[inst.y]);
+                        self.V[inst.x] = diff[0];
+                        // Overflow Check
+                        if (diff[1] == 0) {
+                            self.V[0xF] = 1;
+                        }
+                    },
+                    0x7 => {
+                        const diff = @subWithOverflow(self.V[inst.y], self.V[inst.x]);
+                        self.V[inst.x] = diff[0];
+                        // Overflow Check
+                        if (diff[1] == 0) {
+                            self.V[0xF] = 1;
+                        }
+                    },
+                    0x6 => {
+                        self.V[inst.x] = self.V[inst.y];
+                        self.V[inst.x] >>= 1;
+                        self.V[0xF] = self.V[inst.y] & 0x1;
+                    },
+                    0xE => {
+                        self.V[inst.x] = self.V[inst.y];
+                        self.V[inst.x] <<= 1;
+                        self.V[0xF] = (self.V[inst.y] >> 7) & 0x1;
+                    },
+                    else => {
+                        // Do Nothing
+                    },
+                }
+            },
             0x9 => {
                 if (self.V[inst.x] != self.V[inst.y]) {
                     self.pc += 2;
+                }
+            },
+            0xA => {
+                self.ir = inst.nnn;
+            },
+            0xB => {
+                self.pc = inst.nnn + self.V[0];
+            },
+            0xC => {
+                const rand = std.rand.Random.intRangeAtMost(self.randomizer, u8, 0, 0xFF);
+                self.V[inst.x] = rand & inst.nn;
+            },
+            0xD => {
+                const x = self.V[inst.x] % 64;
+                const y = self.V[inst.y] % 32;
+                self.V[0xF] = 0;
+                for (0..inst.n) |i| {
+                    const sprite = self.memory[self.ir + i];
+                    for (0..8) |j| {
+                        const pixel = (sprite >> (7 - j)) & 0x1;
+                        if (pixel == 1 and self.display[y + i][x + j]) {
+                            self.V[0xF] = 1;
+                        }
+                    }
                 }
             },
             else => {
