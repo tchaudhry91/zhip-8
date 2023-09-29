@@ -1,7 +1,7 @@
 const std = @import("std");
 const expect = std.testing.expect;
 
-const CHIP8 = struct {
+pub const CHIP8 = struct {
     memory: [4096]u8 = [_]u8{0} ** 4096, // 4096 Bytes Memory
     pc: u16 = 0x200, // Program Counter
     ir: u16 = 0, // Index Register
@@ -12,7 +12,7 @@ const CHIP8 = struct {
     sound_timer: u8 = 0,
     keypad: [16]bool = [_]bool{false} ** 16,
     V: [16]u8 = [_]u8{0} ** 16, // Registers
-    randomizer: std.rand.Random = std.rand.Random.init(std.time.currentTime()),
+    randomizer: std.rand.Xoshiro256 = std.rand.DefaultPrng.init(0),
 
     const fontset: [80]u8 = [_]u8{
         0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
@@ -186,10 +186,88 @@ const CHIP8 = struct {
                     const sprite = self.memory[self.ir + i];
                     for (0..8) |j| {
                         const pixel = (sprite >> (7 - j)) & 0x1;
-                        if (pixel == 1 and self.display[y + i][x + j]) {
-                            self.V[0xF] = 1;
+                        if (pixel == 1) {
+                            if (self.display[y + i][x + j]) {
+                                self.V[0xF] = 1;
+                            } else {
+                                self.display[y + i][x + j] = true;
+                            }
                         }
+                        if (x + j == 63) {
+                            break;
+                        }
+                        x += 1;
                     }
+                    y += 1;
+                    if (y == 32) {
+                        break;
+                    }
+                }
+            },
+            0xE => {
+                switch (inst.nn) {
+                    0x9E => {
+                        if (self.keypad[self.V[inst.x]]) {
+                            self.pc += 2;
+                        }
+                    },
+                    0xA1 => {
+                        if (!self.keypad[self.V[inst.x]]) {
+                            self.pc += 2;
+                        }
+                    },
+                    else => {
+                        // Do Nothing
+                    },
+                }
+            },
+            0xF => {
+                switch (inst.nn) {
+                    0x07 => {
+                        self.V[inst.x] = self.delay_timer;
+                    },
+                    0x15 => {
+                        self.delay_timer = self.V[inst.x];
+                    },
+                    0x18 => {
+                        self.sound_timer = self.V[inst.x];
+                    },
+                    0x1E => {
+                        self.ir += self.V[inst.x];
+                    },
+                    0x0A => {
+                        var pressed = false;
+                        for (self.keypad, 0..) |key, i| {
+                            if (key) {
+                                self.V[inst.x] = i;
+                                pressed = true;
+                            }
+                        }
+                        if (!pressed) {
+                            self.pc -= 2;
+                        }
+                    },
+                    0x29 => {
+                        self.ir = fontoffset + (self.V[inst.x] * 5);
+                    },
+                    0x33 => {
+                        self.memory[self.ir] = self.V[inst.x] / 100;
+                        self.memory[self.ir + 1] = (self.V[inst.x] / 10) % 10;
+                        self.memory[self.ir + 2] = self.V[inst.x] % 10;
+                    },
+                    0x55 => {
+                        for (0..inst.x + 1) |i| {
+                            self.memory[self.ir + i] = self.V[i];
+                        }
+                    },
+                    0x65 => {
+                        for (0..inst.x + 1) |i| {
+                            self.V[i] = self.memory[self.ir + i];
+                        }
+                    },
+                    else => {
+                        // Do Nothing
+                    },
                 }
             },
             else => {

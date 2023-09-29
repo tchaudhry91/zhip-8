@@ -1,7 +1,8 @@
 const std = @import("std");
-const chip = @import("chip");
+const chip = @import("./chip8.zig");
+const display = @import("./display.zig");
 
 pub fn main() !void {
-    const chipper = try chip.init();
-    _ = chipper;
+    const emu = chip.CHIP8.init();
+    display.TermDisplay.render(emu.display);
 }
