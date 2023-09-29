@@ -210,9 +210,7 @@ pub const CHIP8 = struct {
                                 self.display[y + i][x + j] = true;
                             }
                         }
-                        x += 1;
                     }
-                    y += 1;
                 }
             },
             0xE => {

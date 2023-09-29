@@ -17,6 +17,7 @@ pub const TermDisplay = struct {
 
         display.maxlines = curses.LINES - 1;
         display.maxcols = curses.COLS - 1;
+        std.debug.print("maxlines: {}, maxcols: {}\n", .{ display.maxlines, display.maxcols });
         return display;
     }
 
