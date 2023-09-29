@@ -12,7 +12,8 @@ pub const CHIP8 = struct {
     sound_timer: u8 = 0,
     keypad: [16]bool = [_]bool{false} ** 16,
     V: [16]u8 = [_]u8{0} ** 16, // Registers
-    randomizer: std.rand.Xoshiro256 = std.rand.DefaultPrng.init(0),
+    //
+    var randomizer: std.rand.Xoshiro256 = std.rand.DefaultPrng.init(0);
 
     const fontset: [80]u8 = [_]u8{
         0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
@@ -56,6 +57,16 @@ pub const CHIP8 = struct {
         }
         self.stack_ptr -= 1;
         self.pc = self.stack[self.stack_ptr];
+    }
+
+    pub fn load_file(self: *CHIP8, fname: []const u8) !void {
+        const file = try std.fs.cwd().openFile(fname, .{});
+        defer file.close();
+        var buf: [4096 - 0x200]u8 = undefined;
+        _ = try file.readAll(&buf);
+        for (buf, 0..) |byte, i| {
+            self.memory[i + 0x200] = byte;
+        }
     }
 
     pub fn emulate(self: *CHIP8) !void {
@@ -175,17 +186,23 @@ pub const CHIP8 = struct {
                 self.pc = inst.nnn + self.V[0];
             },
             0xC => {
-                const rand = std.rand.Random.intRangeAtMost(self.randomizer, u8, 0, 0xFF);
+                const rand = randomizer.random().intRangeAtMost(u8, 0, 0xFF);
                 self.V[inst.x] = rand & inst.nn;
             },
             0xD => {
-                const x = self.V[inst.x] % 64;
-                const y = self.V[inst.y] % 32;
+                var x = self.V[inst.x] & 63;
+                var y = self.V[inst.y] & 31;
                 self.V[0xF] = 0;
                 for (0..inst.n) |i| {
                     const sprite = self.memory[self.ir + i];
                     for (0..8) |j| {
-                        const pixel = (sprite >> (7 - j)) & 0x1;
+                        if (x + j > 63) {
+                            break;
+                        }
+                        if (y + i > 31) {
+                            break;
+                        }
+                        const pixel = (sprite >> @intCast(7 - j)) & 0x1;
                         if (pixel == 1) {
                             if (self.display[y + i][x + j]) {
                                 self.V[0xF] = 1;
@@ -193,15 +210,9 @@ pub const CHIP8 = struct {
                                 self.display[y + i][x + j] = true;
                             }
                         }
-                        if (x + j == 63) {
-                            break;
-                        }
                         x += 1;
                     }
                     y += 1;
-                    if (y == 32) {
-                        break;
-                    }
                 }
             },
             0xE => {
@@ -239,7 +250,7 @@ pub const CHIP8 = struct {
                         var pressed = false;
                         for (self.keypad, 0..) |key, i| {
                             if (key) {
-                                self.V[inst.x] = i;
+                                self.V[inst.x] = @intCast(i);
                                 pressed = true;
                             }
                         }
@@ -269,9 +280,6 @@ pub const CHIP8 = struct {
                         // Do Nothing
                     },
                 }
-            },
-            else => {
-                // Do Nothing
             },
         }
     }

@@ -1,15 +1,37 @@
 const std = @import("std");
+
+const curses = @cImport({
+    @cInclude("curses.h");
+});
+
 pub const TermDisplay = struct {
-    pub fn render(fb: [32][64]bool) void {
-        for (0..32) |y| {
-            for (0..64) |x| {
+    maxlines: c_int = 32,
+    maxcols: c_int = 64,
+
+    pub fn init() !TermDisplay {
+        var display = TermDisplay{};
+        _ = curses.initscr();
+        _ = curses.cbreak();
+        _ = curses.noecho();
+        _ = curses.clear();
+
+        display.maxlines = curses.LINES - 1;
+        display.maxcols = curses.COLS - 1;
+        return display;
+    }
+
+    pub fn render(self: *TermDisplay, fb: [32][64]bool) void {
+        _ = self;
+        for (0..64) |x| {
+            for (0..32) |y| {
                 if (fb[y][x]) {
-                    std.debug.print("{s}", .{"█"});
+                    _ = curses.mvaddch(@intCast(y), @intCast(x), '*');
                 } else {
-                    std.debug.print("{s}", .{" "});
+                    _ = curses.mvaddch(@intCast(y), @intCast(x), ' ');
                 }
             }
-            std.debug.print("\n", .{});
         }
+        _ = curses.refresh();
+        _ = curses.getch();
     }
 };
