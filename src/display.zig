@@ -33,6 +33,5 @@ pub const TermDisplay = struct {
             }
         }
         _ = curses.refresh();
-        _ = curses.getch();
     }
 };
