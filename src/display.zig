@@ -17,11 +17,10 @@ pub const TermDisplay = struct {
 
         display.maxlines = curses.LINES - 1;
         display.maxcols = curses.COLS - 1;
-        std.debug.print("maxlines: {}, maxcols: {}\n", .{ display.maxlines, display.maxcols });
         return display;
     }
 
-    pub fn render(self: *TermDisplay, fb: [32][64]bool) void {
+    pub fn render(self: *TermDisplay, fb: [32][64]bool) u32 {
         _ = self;
         for (0..64) |x| {
             for (0..32) |y| {
@@ -33,5 +32,11 @@ pub const TermDisplay = struct {
             }
         }
         _ = curses.refresh();
+        _ = curses.nodelay(curses.stdscr, true);
+        const key = curses.getch();
+        if (key == curses.ERR) {
+            return 0;
+        }
+        return @intCast(key);
     }
 };

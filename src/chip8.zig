@@ -5,8 +5,8 @@ pub const CHIP8 = struct {
     memory: [4096]u8 = [_]u8{0} ** 4096, // 4096 Bytes Memory
     pc: u16 = 0x200, // Program Counter
     ir: u16 = 0, // Index Register
-    stack: [16]u16 = [_]u16{0} ** 16, // Stack
-    stack_ptr: u8 = 0, // Stack Pointer
+    stack: [1024]u16 = [_]u16{0} ** 1024, // Stack
+    stack_ptr: u32 = 0, // Stack Pointer
     display: [32][64]bool = [_][64]bool{[_]bool{false} ** 64} ** 32,
     delay_timer: u8 = 0,
     sound_timer: u8 = 0,
@@ -44,7 +44,7 @@ pub const CHIP8 = struct {
     }
 
     pub fn push_pc(self: *CHIP8) !void {
-        if (self.stack_ptr == 15) {
+        if (self.stack_ptr == 1023) {
             return error.OutOfMemory;
         }
         self.stack[self.stack_ptr] = self.pc;
@@ -66,6 +66,65 @@ pub const CHIP8 = struct {
         _ = try file.readAll(&buf);
         for (buf, 0..) |byte, i| {
             self.memory[i + 0x200] = byte;
+        }
+    }
+    pub fn set_key(self: *CHIP8, key: u32) void {
+        // reset keys
+        self.keypad = [_]bool{false} ** 16;
+
+        // Check key hex
+        switch (key) {
+            49 => {
+                self.keypad[0x1] = true;
+            },
+            50 => {
+                self.keypad[0x2] = true;
+            },
+            51 => {
+                self.keypad[0x3] = true;
+            },
+            52 => {
+                self.keypad[0xC] = true;
+            },
+            81 => {
+                self.keypad[0x4] = true;
+            },
+            87 => {
+                self.keypad[0x5] = true;
+            },
+            69 => {
+                self.keypad[0x6] = true;
+            },
+            82 => {
+                self.keypad[0xD] = true;
+            },
+            65 => {
+                self.keypad[0x7] = true;
+            },
+            83 => {
+                self.keypad[0x8] = true;
+            },
+            68 => {
+                self.keypad[0x9] = true;
+            },
+            70 => {
+                self.keypad[0xE] = true;
+            },
+            90 => {
+                self.keypad[0xA] = true;
+            },
+            88 => {
+                self.keypad[0x0] = true;
+            },
+            67 => {
+                self.keypad[0xB] = true;
+            },
+            86 => {
+                self.keypad[0xF] = true;
+            },
+            else => {
+                // Do Nothing
+            },
         }
     }
 
@@ -119,7 +178,7 @@ pub const CHIP8 = struct {
                 self.V[inst.x] = inst.nn;
             },
             0x7 => {
-                self.V[inst.x] += inst.nn;
+                self.V[inst.x] +%= inst.nn;
             },
             0x8 => {
                 switch (inst.n) {
